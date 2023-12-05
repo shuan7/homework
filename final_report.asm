@@ -60,7 +60,14 @@ ENDM
               cmp          exit,01h
               jz           exit_program
 .endif
+                            call         OBSTACLE_MOVE
+                            push         cx
+                            mov          cx,08ffh                   ;control obstacle speed
+    loop_1:                 
                             call         SPACE_ESC
+                            loop         loop_1
+                            pop          cx
+
                             cmp          exit,01h
                             jnz          GAME_LOOP
     exit_program:           
@@ -108,6 +115,7 @@ WRITE_SCREEN_BACKGROUND ENDP
 
     ;畫角色
 WRITE_CHARACTOR proc
+                            call         OBSTACLE_MOVE
                             push         ax
                             push         di
                             push         cx
@@ -138,6 +146,7 @@ WRITE_CHARACTOR proc
 WRITE_CHARACTOR endp
     ;清除舊的角色
 WRITE_CHARACTOR_CL proc
+                       call OBSTACLE_MOVE
                        push ax
                        push di
                        push cx
@@ -169,23 +178,31 @@ WRITE_CHARACTOR_CL proc
 WRITE_CHARACTOR_CL endp
     ;是否有跳躍或離開
 SPACE_ESC proc
-                       call OBSTACLE
+    ;call OBSTACLE
+    ;call OBSTACLE_MOVE
                        push ax
                        mov  ax,0c00h                      ;clear keyboard buffer
                        int  21h
 
+    ;push ax
+                       mov  ah,11h
+                       int  16h
+
+                       jz   continue
                        
                        
                        mov  ah,10h
                        int  16h
 
+              
     continue:          
-                       call OBSTACLE_MOVE
 .if al==1bh
                        mov  exit,01h
 .elseif al==20h
                        call CHARACTOR_JUMP
 .endif
+         
+    ;pop  ax
                    pop  ax
                    ret
 SPACE_ESC endp
@@ -363,7 +380,7 @@ OBSTACLE proc
                    xor  dx,dx
                    mov  di,obstacle_position
                    mov  cx,450                  ;450=15d*30d
-    ;mov  ah,obstacle_color
+                   mov  ah,obstacle_color
 
     write_obstacle:
                    inc  dl
@@ -384,12 +401,19 @@ OBSTACLE endp
 
 
 OBSTACLE_MOVE proc
-                        
+
+                             push ax
+                             mov  ax,0a000h
+                             mov  es,ax
+                             mov  ax,0013h
+                             int  10h
+
                              mov  obstacle_color,0fh
-                             call OBSTACLE                ;clear OBSTACLE
-                             sub  obstacle_position,20    ;20 is obstacle move distance
-                             mov  obstacle_color,00h
-                             call OBSTACLE                ;畫出障礙物移動過後
+                             call OBSTACLE               ;clear OBSTACLE
+                             sub  obstacle_position,1    ;20 is obstacle move distance
+                             mov  obstacle_color,01h
+                             call OBSTACLE               ;畫出障礙物移動過後
+                             pop  ax
                              ret
 OBSTACLE_MOVE endp
 
