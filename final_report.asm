@@ -9,37 +9,41 @@ ENDM
 .model small
 
 .data
-    screen_hight            dw 200
-    screen_width            dw 320
-    color                   db 0fh                                               ;white
-    ground_color            db 06h                                               ;brown
-    charactor_init          dw 38420d                                            ;320*120+40,charactor(40*20)
-    charactor_color         db 04h
-    charactor_position      dw 38420d
-    charactor_last_position dw ?
-    exit                    db 0h
-    score                   dw 0h
-    highest_score           dw 0h
-    mesg_1                  db 'ESC to exit,Space jump and start',0ah,0Dh,'$'
-    mesg_2                  db 0ah,0dh,'press Space to restart the game','$'
-    end_game_over           db 01h
+    screen_hight             dw 200
+    screen_width             dw 320
+    color                    db 0fh                                               ;white
+    ground_color             db 06h                                               ;brown
+    charactor_init           dw 38420d                                            ;320*120+40,charactor(40*20)
+    charactor_color          db 04h
+    charactor_position       dw 38420d
+    charactor_last_position  dw ?
+    exit                     db 0h
+    score                    dw 0h
+    highest_score            dw 0h
+    mesg_1                   db 'ESC to exit,Space jump and start',0ah,0Dh,'$'
+    mesg_2                   db 0ah,0dh,'press Space to restart the game','$'
+    end_game_over            db 01h
     
     ;lower left corner  element0(the beging of last line minus 1),element1(the beging of last line plus a line(320)),
     ;lower right corner element2(the last position plus 1),element3(the last postion plus a line(320))
     
-    test_point              dw 4 dup(0)
+    test_point               dw 4 dup(0)
     ;lower_left_next dw 0000h
     ;lower_left_down dw 0000h
     ;lower_right_next dw 0000h
     ;lower_right_down dw 0000h
-    confilct                db 0h
+    confilct                 db 0h
 
     ;obstacle position
-    obstacle_position       dw 41880d
-    ;obstacle_position_1       dw 41880d
-    obstacle_color          db 00h                                               ;black
-
-
+    obstacle_position        dw 41905d
+    obstacle_position_1      dw 41905d
+    obstacle_position_2      dw 41905d
+    obstacle_color           db 00h                                               ;black
+    call_OBSTACLE_MOVE_times dw 0
+    random_system_time       dw 0
+    obstacle_switch          db 1                                                 ;obstacle_switch_1~3 是亂數產生物體的開關 0代表螢幕沒有顯示該物體
+    obstacle_switch_1        db 0
+    obstacle_switch_2        db 0
 .stack 100h
 
 .code
@@ -47,7 +51,8 @@ ENDM
               mov          ax,@data
               mov          ds,ax
               call         INIT_BACKGROUND
-              call         OBSTACLE
+    ;call         OBSTACLE
+    ;call         OBSTACLE_1
     GAME_LOOP:
 .if end_game_over == 01h
                 
@@ -62,7 +67,7 @@ ENDM
 .endif
                             call         OBSTACLE_MOVE
                             push         cx
-                            mov          cx,08ffh                   ;control obstacle speed
+                            mov          cx,07ffh                   ;control obstacle speed
     loop_1:                 
                             call         SPACE_ESC
                             loop         loop_1
@@ -391,34 +396,172 @@ OBSTACLE proc
                    sub  di,15d
                    xor  dl,dl
 .endif
-                             loop write_obstacle
-                             pop  ax
-                             pop  bx
-                             pop  cx
-                             pop  dx
-                             ret
+                     loop write_obstacle
+                     pop  ax
+                     pop  bx
+                     pop  cx
+                     pop  dx
+                     ret
 OBSTACLE endp
 
+OBSTACLE_1 proc
+                     push ax
+                     push bx
+                     push cx
+                     push dx
+                     xor  di,di
+                     xor  dx,dx
+                     mov  di,obstacle_position_1
+                     mov  cx,450                    ;450=15d*30d
+                     mov  ah,obstacle_color
+
+    write_obstacle_1:
+                     inc  dl
+                     mov  es:[di],ah
+                     inc  di
+.if dl==15d
+                     add  di,320d
+                     sub  di,15d
+                     xor  dl,dl
+.endif
+                     loop write_obstacle_1
+                     pop  ax
+                     pop  bx
+                     pop  cx
+                     pop  dx
+                     ret
+OBSTACLE_1 endp
+
+OBSTACLE_2 proc
+                     push ax
+                     push bx
+                     push cx
+                     push dx
+                     xor  di,di
+                     xor  dx,dx
+                     mov  di,obstacle_position_2
+                     mov  cx,450                    ;450=15d*30d
+                     mov  ah,obstacle_color
+
+    write_obstacle_2:
+                     inc  dl
+                     mov  es:[di],ah
+                     inc  di
+.if dl==15d
+                     add  di,320d
+                     sub  di,15d
+                     xor  dl,dl
+.endif
+                  loop write_obstacle_2
+                  pop  ax
+                  pop  bx
+                  pop  cx
+                  pop  dx
+                  ret
+OBSTACLE_2 endp
 
 OBSTACLE_MOVE proc
+                  call RANDOM_OBSTACLE_GENERATE
+                  push ax
+                  push dx
+    ;inc  call_OBSTACLE_MOVE_times
+                  
 
-                             push ax
-                             mov  ax,0a000h
-                             mov  es,ax
-                             mov  ax,0013h
-                             int  10h
+                  
 
-                             mov  obstacle_color,0fh
-                             call OBSTACLE               ;clear OBSTACLE
-                             sub  obstacle_position,1    ;20 is obstacle move distance
-                             mov  obstacle_color,01h
-                             call OBSTACLE               ;畫出障礙物移動過後
+.if obstacle_switch==1
+                  mov  obstacle_color,0fh
+                  call OBSTACLE                    ;clear OBSTACLE
+                  sub  obstacle_position,1         ;1 is obstacle move distance
+                  mov  obstacle_color,00h
+                  call OBSTACLE                    ;畫出障礙物移動過後
+.endif
+          mov  dx,obstacle_position
+.if dx==41600d
+          mov  obstacle_switch,0
+          mov  obstacle_color,0fh
+          call OBSTACLE                    ;clear OBSTACLE
+          mov  obstacle_position,41905d
+          mov  obstacle_color,00h
+.endif
+
+.if obstacle_switch_1==1
+          mov  obstacle_color,0fh
+          call OBSTACLE_1               ;clear OBSTACLE
+          sub  obstacle_position_1,1    ;1 is obstacle move distance
+          mov  obstacle_color,00h
+          call OBSTACLE_1               ;畫出障礙物移動過後
+.endif
+          mov  dx,obstacle_position_1
+.if dx==41600d
+          mov  obstacle_switch_1,0
+          mov  obstacle_color,0fh
+          call OBSTACLE_1                    ;clear OBSTACLE
+          mov  obstacle_position_1,41905d
+          mov  obstacle_color,00h
+.endif
+
+.if obstacle_switch_2==1
+          mov  obstacle_color,0fh
+          call OBSTACLE_2               ;clear OBSTACLE
+          sub  obstacle_position_2,1    ;1 is obstacle move distance
+          mov  obstacle_color,00h
+          call OBSTACLE_2               ;畫出障礙物移動過後
+.endif
+          mov  dx,obstacle_position_2
+.if dx==41600d
+          mov  obstacle_switch_2,0
+          mov  obstacle_color,0fh
+          call OBSTACLE_2                    ;clear OBSTACLE
+          mov  obstacle_position_2,41905d
+          mov  obstacle_color,00h
+.endif
+                             pop  dx
                              pop  ax
                              ret
 OBSTACLE_MOVE endp
 
 RANDOM_OBSTACLE_GENERATE proc
+                             push ax
+                             push bx
+                             push dx
+                             xor  dx,dx
+                             mov  ah,2ch
+                             int  21h
+                             xor  dh,dh
+                             mov  random_system_time,dx
+                             add  random_system_time,40     ;使亂數在40~139間
+.if obstacle_switch==0
+                             mov  bx,obstacle_position
+                             sub  bx,obstacle_position_2
+                             cmp  bx,random_system_time
+                             jb   L1
+                             mov  obstacle_switch,1
+    L1:                      
+                             xor  bx,bx
 
+.elseif obstacle_switch_1==0
+                             mov  bx,obstacle_position_1
+                             sub  bx,obstacle_position
+                             cmp  bx,random_system_time
+                             jb   L2
+                             mov  obstacle_switch_1,1
+    L2:                      
+                             xor  bx,bx
+
+.elseif obstacle_switch_2==0
+                             mov  bx,obstacle_position_2
+                             sub  bx,obstacle_position_1
+                             cmp  bx,random_system_time
+                             jb   L3
+                             mov  obstacle_switch_2,1
+    L3:                      
+.endif
+                             
+                             pop  ax
+                             pop  bx
+                             pop  dx
+                             ret
 RANDOM_OBSTACLE_GENERATE endp
 
 OBSTACLE_BORDER proc
