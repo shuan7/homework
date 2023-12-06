@@ -67,7 +67,7 @@ ENDM
 .endif
                             call         OBSTACLE_MOVE
                             push         cx
-                            mov          cx,07ffh                   ;control obstacle speed
+                            mov          cx,03ffh                   ;control obstacle speed
     loop_1:                 
                             call         SPACE_ESC
                             loop         loop_1
@@ -162,6 +162,7 @@ WRITE_CHARACTOR_CL proc
                        mov  di,charactor_position
                        mov  ah,color
     CHARACTOR_LOOP_CL: 
+
                        mov  es:[di],ah
                        inc  di
                        inc  cx
@@ -186,11 +187,8 @@ SPACE_ESC proc
     ;call OBSTACLE
     ;call OBSTACLE_MOVE
                        push ax
-                       mov  ax,0c00h                      ;clear keyboard buffer
-                       int  21h
-
     ;push ax
-                       mov  ah,11h
+                       mov  ah,01h
                        int  16h
 
                        jz   continue
@@ -206,7 +204,8 @@ SPACE_ESC proc
 .elseif al==20h
                        call CHARACTOR_JUMP
 .endif
-         
+                   mov  ax,0c00h                 ;clear keyboard buffer
+                   int  21h
     ;pop  ax
                    pop  ax
                    ret
@@ -521,6 +520,14 @@ OBSTACLE_MOVE proc
                              ret
 OBSTACLE_MOVE endp
 
+
+
+
+
+
+
+
+
 RANDOM_OBSTACLE_GENERATE proc
                              push ax
                              push bx
@@ -530,7 +537,7 @@ RANDOM_OBSTACLE_GENERATE proc
                              int  21h
                              xor  dh,dh
                              mov  random_system_time,dx
-                             add  random_system_time,40     ;使亂數在40~139間
+                             add  random_system_time,90     ;使亂數在40~139間
 .if obstacle_switch==0
                              mov  bx,obstacle_position
                              sub  bx,obstacle_position_2
@@ -564,10 +571,13 @@ RANDOM_OBSTACLE_GENERATE proc
                              ret
 RANDOM_OBSTACLE_GENERATE endp
 
-OBSTACLE_BORDER proc
 
-                 
-OBSTACLE_BORDER endp
+
+
+
+
+
+
 
 PLAYER_SCORE proc
                              push ax
