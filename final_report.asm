@@ -6,74 +6,105 @@ PRINT_STRING MACRO params
                  pop  ax
 ENDM
 
+PrintStr macro string                ;輸出字串
+             mov ah,09h
+             mov dx,offset string
+             int 21h
+endm
+
+SetCursor macro row,col        ;設定游標位置
+              mov dh,row
+              mov dl,col
+              mov bx,00h
+              mov ah,02h
+              int 10h
+endm
+
+printstr13h macro str,atr,len,row,col,cursor_move        ;繪圖模式輸出字串
+                mov ax,ds
+                mov es,ax
+                mov bp,offset str
+                mov ah,13h
+                mov al,cursor_move
+                mov bh,00
+                mov bl,atr
+                mov cx,len
+                mov dh,row
+                mov dl,col
+                int 10h
+endm
+
 .model small
 
 .data
-    screen_hight             dw 200
-    screen_width             dw 320
-    color                    db 0fh                                               ;white
-    ground_color             db 06h                                               ;brown
-    charactor_init           dw 38420d                                            ;320*120+40,charactor(40*20)
-    charactor_color          db 04h
-    charactor_position       dw 38420d
-    charactor_last_position  dw ?
-    exit                     db 0h
-    score                    dw 0h
-    highest_score            dw 0h
-    mesg_1                   db 'ESC to exit,Space jump and start',0ah,0Dh,'$'
-    mesg_2                   db 0ah,0dh,'press Space to restart the game','$'
-    end_game_over            db 01h
-    
-    ;lower left corner  element0(the beging of last line minus 1),element1(the beging of last line plus a line(320)),
-    ;lower right corner element2(the last position plus 1),element3(the last postion plus a line(320))
-    
-    test_point               dw 4 dup(0)
-    ;lower_left_next dw 0000h
-    ;lower_left_down dw 0000h
-    ;lower_right_next dw 0000h
-    ;lower_right_down dw 0000h
-    confilct                 db 0h
-
+    screen_hight            dw 200
+    screen_width            dw 320
+    color                   db 0fh                                               ;white
+    ground_color            db 06h                                               ;brown
+    charactor_init          dw 38440d                                            ;320*120+40,charactor(40*20)
+    charactor_color         db 04h
+    charactor_position      dw 38440d
+    charactor_last_position dw 50940d
+    exit_                   db 0h
+    score                   dw 0h
+    highest_score           dw 0h
+    mesg_1                  db 'ESC to exit,Space jump and start',0ah,0Dh,'$'
+    mesg_2                  db 0ah,0dh,'press Space to restart the game','$'
+    mesg_3                  db 'HI=','$'
+    end_game_over           db 01h
+        
     ;obstacle position
-    obstacle_position        dw 41905d
-    obstacle_position_1      dw 41905d
-    obstacle_position_2      dw 41905d
-    obstacle_color           db 00h                                               ;black
-    call_OBSTACLE_MOVE_times dw 0
-    random_system_time       dw 0
-    obstacle_switch          db 1                                                 ;obstacle_switch_1~3 是亂數產生物體的開關 0代表螢幕沒有顯示該物體
-    obstacle_switch_1        db 0
-    obstacle_switch_2        db 0
+    obstacle_init           dw 41899d                                            ;320*130+300 起始點
+    obstacle_position       dw 41800d,41850d,41899d
+    obstacle_color          db 00h                                               ;black
+    obstacle_number         dw 3d
+    obstacle_position_index dw 0d
+    x_num                   db "N:",3 dup(' '),'$'
+    y_num                   db "H:",3 dup(' '),'$'
+    score_now               dw -1
+    score_high              dw 0
+
+
 .stack 100h
 
 .code
+    ;   ASCII_OUTPUT proto near c,arg:word
+              OBSTACLE     proto near c,arg:byte
+
+
     main:     
               mov          ax,@data
               mov          ds,ax
               call         INIT_BACKGROUND
-    ;call         OBSTACLE
-    ;call         OBSTACLE_1
+              call         score_output
     GAME_LOOP:
 .if end_game_over == 01h
-                
-              call         PLAYER_SCORE
               PRINT_STRING mesg_2
               mov          dx,0000h
               mov          score,dx
               call         RESTART
               call         INIT_BACKGROUND
-              cmp          exit,01h
+              cmp          exit_,01h
               jz           exit_program
 .endif
-                            call         OBSTACLE_MOVE
-                            push         cx
-                            mov          cx,03ffh                   ;control obstacle speed
-    loop_1:                 
-                            call         SPACE_ESC
-                            loop         loop_1
-                            pop          cx
+          call   score_output
+          call   RANDOM_OBSTACLE_GENERATE
+          invoke OBSTACLE,obstacle_color
+          mov    di,charactor_last_position
+          mov    ah,obstacle_color
+.if es:[di] == ah
+          mov    end_game_over,01h
+          jmp    GAME_LOOP
+.endif
+                            xor          di,di
+                            xor          ah,ah
 
-                            cmp          exit,01h
+
+                            call         OBSTACLE_MOVE
+                            call         DELAY
+                            call         SPACE_ESC
+
+                            cmp          exit_,01h
                             jnz          GAME_LOOP
     exit_program:           
                             call         INIT_SCREEN
@@ -120,7 +151,6 @@ WRITE_SCREEN_BACKGROUND ENDP
 
     ;畫角色
 WRITE_CHARACTOR proc
-                            call         OBSTACLE_MOVE
                             push         ax
                             push         di
                             push         cx
@@ -130,19 +160,24 @@ WRITE_CHARACTOR proc
                             xor          di,di
                             mov          di,charactor_position
                             mov          ah,charactor_color
+                            mov          al,obstacle_color
     CHARACTOR_LOOP:         
-                            mov          es:[di],ah
-                            inc          di
-                            inc          cx
-.if cx < 20d
-                            jmp          CHARACTOR_LOOP
+.if es:[di] == al
+                            mov          end_game_over,01h
 .endif
-          xor cx,cx
-          add di,300d
-          inc dx
-.if dx < 40d
+          mov es:[di],ah
+          inc di
+          inc cx
+.if cx < 20d
           jmp CHARACTOR_LOOP
 .endif
+                       xor  cx,cx
+                       add  di,300d
+                       inc  dx
+                       cmp  dx,40d
+                       jnz  CHARACTOR_LOOP
+                       sub  di,300d
+                       mov  charactor_last_position,di
                        pop  dx
                        pop  cx
                        pop  di
@@ -151,7 +186,6 @@ WRITE_CHARACTOR proc
 WRITE_CHARACTOR endp
     ;清除舊的角色
 WRITE_CHARACTOR_CL proc
-                       call OBSTACLE_MOVE
                        push ax
                        push di
                        push cx
@@ -162,7 +196,6 @@ WRITE_CHARACTOR_CL proc
                        mov  di,charactor_position
                        mov  ah,color
     CHARACTOR_LOOP_CL: 
-
                        mov  es:[di],ah
                        inc  di
                        inc  cx
@@ -175,7 +208,6 @@ WRITE_CHARACTOR_CL proc
 .if dx < 40d
           jmp CHARACTOR_LOOP_CL
 .endif
-                       mov  charactor_last_position,di
                        pop  dx
                        pop  cx
                        pop  di
@@ -184,29 +216,16 @@ WRITE_CHARACTOR_CL proc
 WRITE_CHARACTOR_CL endp
     ;是否有跳躍或離開
 SPACE_ESC proc
-    ;call OBSTACLE
-    ;call OBSTACLE_MOVE
                        push ax
-    ;push ax
-                       mov  ah,01h
+                       mov  ah,01h            ;掃描但不等待
                        int  16h
-
-                       jz   continue
-                       
-                       
-                       mov  ah,10h
-                       int  16h
-
-              
-    continue:          
 .if al==1bh
-                       mov  exit,01h
+                       mov  exit_,01h
 .elseif al==20h
                        call CHARACTOR_JUMP
 .endif
-                   mov  ax,0c00h                 ;clear keyboard buffer
+                   mov  ax,0c00h                    ;clear keyboard buffer
                    int  21h
-    ;pop  ax
                    pop  ax
                    ret
 SPACE_ESC endp
@@ -215,37 +234,37 @@ SPACE_ESC endp
 CHARACTOR_JUMP proc
                    push ax
                    push di
-    ;mov ax,0013h
-    ;int 10h
-                   mov  bx,1280d                 ;4 lines
+                   mov  bx,1280d                    ;4 lines
     JUMP_LOOP_UP:  
+                   call RANDOM_OBSTACLE_GENERATE
                    call WRITE_CHARACTOR_CL
+                   call OBSTACLE_MOVE
+                   inc  score_now                   ;計分數
                    sub  charactor_position,bx
                    call WRITE_CHARACTOR
-                   call KEEP_TEST_POINT
-                   call TEST_CONFLICT
-.if confilct == 01h
-                   call RESTART
+.if end_game_over == 01h
+                   jmp  exit_jump
 .endif
-
-                   cmp  charactor_position,(320d*40d)+20
-                   call DELAY
     
+                   cmp  charactor_position,(320d*40d)+40
+                   call DELAY
                    jnz  JUMP_LOOP_UP
 
     JUMP_LOOP_DOWN:
+                   call RANDOM_OBSTACLE_GENERATE
                    call WRITE_CHARACTOR_CL
+                   call OBSTACLE_MOVE
+                   inc  score_now                           ;計分數
                    add  charactor_position,bx
                    call WRITE_CHARACTOR
-                   call KEEP_TEST_POINT
-                   call TEST_CONFLICT
-.if confilct == 01h
-                   call RESTART
+.if end_game_over == 01h
+                   jmp  exit_jump
 .endif
-                   cmp  charactor_position,38420d
+                   cmp  charactor_position,38440d
                    call DELAY
-    
+    ;call RANDOM_OBSTACLE_GENERATE
                    jnz  JUMP_LOOP_DOWN
+    exit_jump:     
                    pop  di
                    pop  ax
                    ret
@@ -274,322 +293,276 @@ INIT_SCREEN proc
 INIT_SCREEN endp
 
 RESTART proc
+                   mov  score_now,0
                    push ax
+                   mov  charactor_position,38440d
+                   mov  obstacle_position[0],0
+                   mov  obstacle_position[2],0
+                   mov  obstacle_position[4],0
+                   mov  obstacle_number,0d
+                   mov  obstacle_position_index,0d
                    mov  ah,00h
                    int  16h
 .if al == 20h
                    mov  end_game_over,00h
 .elseif al == 1bh
-                   mov  exit,01h
+                   mov  exit_,01h
 .endif
-                   pop  ax
-                   ret
+             mov  ax,0c00h          ;clear keyboard buffer
+             int  21h
+             pop  ax
+             ret
 RESTART endp
 
-ASCII_OUTPUT proc
-                   push ax
-                   push dx
-                   mov  ah,02h
-                   mov  dl,'H'
-                   int  21h
-                   mov  dl,'I'
-                   int  21h
-                   mov  dl,':'
-                   int  21h
-                   mov  dx,score
-                   mov  cx,04h
-    score_hex_loop:
-                   push cx
-                   mov  cl,04h
-                   rol  dx,cl
-                   pop  cx
-                   push dx
-                   and  dl,0fh
-.if dl > 09h
-                   add  dl,'7'
-.else
-         add dl,'0'
+OBSTACLE proc near c,color_arg:byte
+             push ax
+             push cx
+             push dx
+             push di
+.if obstacle_number == 0
+             jmp  leave_obstacle
 .endif
-                     int  21h
-                     pop  dx
-                     loop score_hex_loop
-                     mov  dl,' '
-                     int  21h
-                     mov  dx,highest_score
-                     mov  cx,04h
-    h_score_hex_loop:
-                     push cx
-                     mov  cl,04h
-                     rol  dx,cl
-                     pop  cx
-                     push dx
-                     and  dl,0fh
-.if dl > 09h
-                     add  dl,'7'
-.else
-         add dl,'0'
+                        mov  cx,obstacle_number
+                        mov  si,0
+    obstacle_loop:      
+                        push cx
+                        mov  cx,0d
+                        mov  dx,0d
+                        mov  di,obstacle_position[si]
+                        mov  ah,color_arg
+    write_obstacle_loop:
+                        mov  es:[di],ah
+                        inc  di
+                        inc  cx
+.if cx < 20d
+                        jmp  write_obstacle_loop
 .endif
-                    int  21h
-                    pop  dx
-                    loop h_score_hex_loop
-                    pop  dx
-                    pop  ax
-                    ret
-ASCII_OUTPUT endp
-
-KEEP_TEST_POINT proc
-                    push dx
-                    push bx
-                    mov  dx,charactor_last_position
-                    mov  test_point[0],dx
-                    sub  test_point[0],21d
-                    mov  test_point[2],dx
-                    add  test_point[2],320d
-                    mov  test_point[4],dx
-                    add  test_point[4],1d
-                    mov  test_point[6],dx
-                    add  test_point[6],320d
-                    pop  bx
-                    pop  dx
-                    ret
-KEEP_TEST_POINT endp
-
-TEST_CONFLICT proc
-                    push ax
-                    push di
-                    push cx
-                    mov  cx,4d
-                    mov  di,test_point[0]
-                    mov  al,obstacle_color
-    test_loop:      
-.if es:[di] == al
-                    mov  exit,01h
-                    jmp  exit_test
+          xor cx,cx
+          add di,300d
+          inc dx
+.if dx < 30d
+          jmp write_obstacle_loop
 .endif
-                   add  di,2d
-                   loop test_loop
-    exit_test:     
-                   pop  cx
-                   pop  di
-                   pop  ax
+                   add    si,2h
+                   pop    cx
+                   loop   obstacle_loop
+    leave_obstacle:
+                   pop    di
+                   pop    dx
+                   pop    cx
+                   pop    ax
                    ret
-TEST_CONFLICT endp
-
-OBSTACLE proc
-                   push ax
-                   push bx
-                   push cx
-                   push dx
-                   xor  di,di
-                   xor  dx,dx
-                   mov  di,obstacle_position
-                   mov  cx,450                  ;450=15d*30d
-                   mov  ah,obstacle_color
-
-    write_obstacle:
-                   inc  dl
-                   mov  es:[di],ah
-                   inc  di
-.if dl==15d
-                   add  di,320d
-                   sub  di,15d
-                   xor  dl,dl
-.endif
-                     loop write_obstacle
-                     pop  ax
-                     pop  bx
-                     pop  cx
-                     pop  dx
-                     ret
 OBSTACLE endp
 
-OBSTACLE_1 proc
-                     push ax
-                     push bx
-                     push cx
-                     push dx
-                     xor  di,di
-                     xor  dx,dx
-                     mov  di,obstacle_position_1
-                     mov  cx,450                    ;450=15d*30d
-                     mov  ah,obstacle_color
-
-    write_obstacle_1:
-                     inc  dl
-                     mov  es:[di],ah
-                     inc  di
-.if dl==15d
-                     add  di,320d
-                     sub  di,15d
-                     xor  dl,dl
-.endif
-                     loop write_obstacle_1
-                     pop  ax
-                     pop  bx
-                     pop  cx
-                     pop  dx
-                     ret
-OBSTACLE_1 endp
-
-OBSTACLE_2 proc
-                     push ax
-                     push bx
-                     push cx
-                     push dx
-                     xor  di,di
-                     xor  dx,dx
-                     mov  di,obstacle_position_2
-                     mov  cx,450                    ;450=15d*30d
-                     mov  ah,obstacle_color
-
-    write_obstacle_2:
-                     inc  dl
-                     mov  es:[di],ah
-                     inc  di
-.if dl==15d
-                     add  di,320d
-                     sub  di,15d
-                     xor  dl,dl
-.endif
-                  loop write_obstacle_2
-                  pop  ax
-                  pop  bx
-                  pop  cx
-                  pop  dx
-                  ret
-OBSTACLE_2 endp
-
+    ;移動所有障礙物每次4d
 OBSTACLE_MOVE proc
-                  call RANDOM_OBSTACLE_GENERATE
-                  push ax
-                  push dx
-    ;inc  call_OBSTACLE_MOVE_times
-                  
-
-                  
-
-.if obstacle_switch==1
-                  mov  obstacle_color,0fh
-                  call OBSTACLE                    ;clear OBSTACLE
-                  sub  obstacle_position,1         ;1 is obstacle move distance
-                  mov  obstacle_color,00h
-                  call OBSTACLE                    ;畫出障礙物移動過後
+                   push   ax
+                   push   cx
+                   push   dx
+                   push   si
+                   mov    cx,obstacle_number
+                   mov    si,0d
+                   cmp    cx,0
+                   jz     leave_move
+                   invoke OBSTACLE,color
+.if word ptr [obstacle_position] != 0000h
+                   sub    word ptr [obstacle_position],4d
 .endif
-          mov  dx,obstacle_position
-.if dx==41600d
-          mov  obstacle_switch,0
-          mov  obstacle_color,0fh
-          call OBSTACLE                    ;clear OBSTACLE
-          mov  obstacle_position,41905d
-          mov  obstacle_color,00h
+.if word ptr [obstacle_position+2] != 0000h
+          sub word ptr [obstacle_position+2],4d
 .endif
-
-.if obstacle_switch_1==1
-          mov  obstacle_color,0fh
-          call OBSTACLE_1               ;clear OBSTACLE
-          sub  obstacle_position_1,1    ;1 is obstacle move distance
-          mov  obstacle_color,00h
-          call OBSTACLE_1               ;畫出障礙物移動過後
+.if word ptr [obstacle_position+4] != 0000h
+          sub word ptr [obstacle_position+4],4d
 .endif
-          mov  dx,obstacle_position_1
-.if dx==41600d
-          mov  obstacle_switch_1,0
-          mov  obstacle_color,0fh
-          call OBSTACLE_1                    ;clear OBSTACLE
-          mov  obstacle_position_1,41905d
-          mov  obstacle_color,00h
+                           call   OBSTACLE_BOUNDARY
+                           invoke OBSTACLE,obstacle_color
+    leave_move:            
+                           pop    si
+                           pop    dx
+                           pop    ax
+                           pop    ax
+                           ret
+OBSTACLE_MOVE endp
+    ;清除碰到邊界的障礙物
+CLAER_OBSTACLE proc
+                           push   ax
+                           push   dx
+                           push   di
+                           mov    di,obstacle_position[0]
+                           mov    ah,color
+    write_obstacle_loop_cl:
+                           mov    es:[di],ah
+                           inc    di
+                           inc    cx
+.if cx < 20d
+                           jmp    write_obstacle_loop_cl
 .endif
-
-.if obstacle_switch_2==1
-          mov  obstacle_color,0fh
-          call OBSTACLE_2               ;clear OBSTACLE
-          sub  obstacle_position_2,1    ;1 is obstacle move distance
-          mov  obstacle_color,00h
-          call OBSTACLE_2               ;畫出障礙物移動過後
+          xor cx,cx
+          add di,300d
+          inc dx
+.if dx < 30d
+          jmp write_obstacle_loop_cl
 .endif
-          mov  dx,obstacle_position_2
-.if dx==41600d
-          mov  obstacle_switch_2,0
-          mov  obstacle_color,0fh
-          call OBSTACLE_2                    ;clear OBSTACLE
-          mov  obstacle_position_2,41905d
-          mov  obstacle_color,00h
-.endif
+                             mov  obstacle_position[0],0d
+                             call SHIFT_OBSTACLE
+                             dec  word ptr [obstacle_number]
+                             sub  word ptr [obstacle_position_index],2d
+                             pop  di
                              pop  dx
                              pop  ax
                              ret
-OBSTACLE_MOVE endp
+CLAER_OBSTACLE endp
 
 
-
-
-
-
-
-
-
+    ;未成功
+    ;用ivrine16的函式產生亂數，當亂數除41等於0時且障礙物數量(obstacle_number)不等於三時，再新增一個障礙物
 RANDOM_OBSTACLE_GENERATE proc
                              push ax
-                             push bx
                              push dx
-                             xor  dx,dx
-                             mov  ah,2ch
-                             int  21h
-                             xor  dh,dh
-                             mov  random_system_time,dx
-                             add  random_system_time,90     ;使亂數在40~139間
-.if obstacle_switch==0
-                             mov  bx,obstacle_position
-                             sub  bx,obstacle_position_2
-                             cmp  bx,random_system_time
-                             jb   L1
-                             mov  obstacle_switch,1
-    L1:                      
-                             xor  bx,bx
-
-.elseif obstacle_switch_1==0
-                             mov  bx,obstacle_position_1
-                             sub  bx,obstacle_position
-                             cmp  bx,random_system_time
-                             jb   L2
-                             mov  obstacle_switch_1,1
-    L2:                      
-                             xor  bx,bx
-
-.elseif obstacle_switch_2==0
-                             mov  bx,obstacle_position_2
-                             sub  bx,obstacle_position_1
-                             cmp  bx,random_system_time
-                             jb   L3
-                             mov  obstacle_switch_2,1
-    L3:                      
+                             push bx
+                             push si
+.if obstacle_number == 3                                                   ;如果目前障礙物數量有三個就不用再產生障礙物
+                             jmp  leave_generate
 .endif
-                             
-                             pop  ax
+          mov ah,2ch
+          int 21h                           ;CH:CL hour/min,DH:DL second:1/100second
+          xor dh,dh
+          add dx,70                         ;70~179
+          mov si,obstacle_position_index
+.if obstacle_number != 0
+          mov bx,obstacle_init
+          sub bx,obstacle_position[si]
+.else
+         int 21h
+         mov cx,dx
+         xor ch,ch
+.endif
+
+    ;xor bx,000000000010011b
+
+.if dx > 140 && (bx > 70 || cx > 30 )
+
+          mov bx,obstacle_init
+          mov obstacle_position[si],bx
+          inc word ptr [obstacle_number]
+          add word ptr [obstacle_position_index],2d    ;因為obstacle_number有2bytes所以他的索引值要是2的倍數
+.endif
+    leave_generate:          
+                             pop  si
                              pop  bx
                              pop  dx
+                             pop  ax
                              ret
 RANDOM_OBSTACLE_GENERATE endp
-
-
-
-
-
-
-
-
-
-PLAYER_SCORE proc
+    ;將obstacle_position前移一元素
+SHIFT_OBSTACLE proc
                              push ax
-                             push dx
-                             mov  dx,score
-.if dx >= highest_score
-                             mov  highest_score,dx
+                             mov  ax,obstacle_position[2]
+                             mov  obstacle_position[0],ax
+                             mov  ax,obstacle_position[4]
+                             mov  obstacle_position[2],ax
+                             xor  ax,ax
+                             mov  obstacle_position[4],ax
+                             pop  ax
+                             ret
+SHIFT_OBSTACLE endp
+
+    ;如果obstacle_position[0]的位置除以320等於0則清除該obstacle並將剩餘兩個obstacle_position前移
+OBSTACLE_BOUNDARY proc
+                             push ax
+                             mov  ax,obstacle_position[0]
+.if ax < 41604d
+                             call CLAER_OBSTACLE
 .endif
-                 call ASCII_OUTPUT
-                 pop  dx
-                 pop  ax
+                      pop  ax
+                      ret
+OBSTACLE_BOUNDARY endp
+
+score_output proc
+                      push ax
+                      push cx
+                      push dx
+                      push di
+                      inc  score_now
+                      mov  dx,score_high
+.if dx <=score_now
+                      mov  dx,score_now
+                      mov  score_high,dx
+.endif
+                 mov       di,offset x_num
+                 call      clear              ;清除x_num字串的後三個字元
+                 mov       di,offset y_num
+                 call      clear              ;清除y_num字串的後三個字元
+    ;MUS_GET03                               ;取得滑鼠狀態及游標位置
+                 mov       dx,score_high
+                 push      dx                 ;dx為歷史最高分數
+
+                 mov       ax,score_now       ;cx為滑鼠x座標
+                 mov       di,offset x_num
+                 call      tran               ;x座標轉換為十進制
+                 pop       ax
+                 mov       di,offset y_num
+                 call      tran               ;y座標轉換為十進制
+	
+                 SetCursor 0,35               ;設定游標位置
+                 PrintStr  x_num
+                 SetCursor 1,35               ;設定游標位置
+                 PrintStr  y_num
+
+                 pop       di
+                 pop       dx
+                 pop       cx
+                 pop       ax
+
                  ret
-PLAYER_SCORE endp
+score_output endp
+
+    ;清除字串的後三個字元
+clear proc
+                 push      ax
+                 push      cx
+                 push      di
+                 mov       cx,3
+    L1:          
+                 mov       al,' '
+                 mov       [di+2],al
+                 inc       di
+                 loop      L1
+                 pop       di
+                 pop       cx
+                 pop       ax
+                 ret
+clear endp
+
+    ;十六進制轉十進制
+tran proc
+                 push      ax
+                 push      bx
+                 push      cx
+                 push      dx
+                 push      di
+                 mov       cx,0
+    Hex2Dec:     
+                 inc       cx
+                 mov       bx,10
+                 mov       dx,0
+                 div       bx
+                 push      dx
+                 cmp       ax,0
+                 jne       Hex2Dec
+    dec2Ascll:   
+                 pop       ax
+                 add       al,30h
+                 mov       [di+2],al
+                 inc       di
+                 loop      dec2Ascll
+                 pop       di
+                 pop       dx
+                 pop       cx
+                 pop       bx
+                 pop       ax
+                 ret
+tran endp
+
 
 end main
