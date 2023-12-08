@@ -39,9 +39,9 @@ endm
 .data
     screen_hight            dw 200
     screen_width            dw 320
-    color                   db 0fh                                               ;white
-    ground_color            db 06h                                               ;brown
-    charactor_init          dw 38440d                                            ;320*120+40,charactor(40*20)
+    color                   db 0fh                                                                                                                                                                                                        ;white
+    ground_color            db 06h                                                                                                                                                                                                        ;brown
+    charactor_init          dw 38440d                                                                                                                                                                                                     ;320*120+40,charactor(40*20)
     charactor_color         db 04h
     charactor_position      dw 38440d
     charactor_last_position dw 50940d
@@ -54,18 +54,27 @@ endm
     end_game_over           db 01h
         
     ;obstacle position
-    obstacle_init           dw 41899d                                            ;320*130+300 起始點
-    obstacle_position       dw 41800d,41850d,41899d
-    obstacle_color          db 00h                                               ;black
+    obstacle_init           dw 41899d                                                                                                                                                                                                     ;320*130+300 起始點
+    obstacle_position       dw 41899d,41899d,41899d
+    obstacle_color          db 00h                                                                                                                                                                                                        ;black
     obstacle_number         dw 3d
-    obstacle_position_index dw 0d
+    obstacle_position_index dw 0d                                                                                                                                                                                                         ;用來判斷障礙物前後距離
     x_num                   db "N:",3 dup(' '),'$'
     y_num                   db "H:",3 dup(' '),'$'
-    score_now               dw -1
+    score_now               dw 0
     score_high              dw 0
-
-
+    call_score_output_time  db 0
+    write_tree_part1        dw 0,1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17,18,19,320,321,322,323,324,325,326,327,328,332,333,334,335,336                                                                                                     ;33組
+    write_tree_part2        dw 337,338,339,640,641,642,643,644,645,646,647,653,654,655,656,657,658,659,960,961,962,963,964,965,966,974,975,976,977,978,979,1280,1281                                                                      ;33組
+    write_tree_part3        dw 1282,1283,1284,1285,1295,1296,1297,1298,1299,1600,1601,1602,1603,1604,1616,1617,1618,1619,1920,1921,1922,1923,1937,1938,1939,2240,2241,2242,2243,2257,2258,2259,2560,2561,2562,2578,2579,2880,2881,2899    ;33
+    write_tree_part4        dw 3520,3521,3522,3523,3524,3525,3526,3527,3528,3529,3531,3532,3533,3534,3535,3536,3537,3538,3539,3840,3841,3842,3843,3844,3845,3846,3847,3848,3852,3853,3854,3855,3856                                       ;37
+    write_tree_part5        dw 3857,3858,3859,4160,4161,4162,4163,4164,4165,4166,4167,4173,4174,4175,4176,4177,4178,4179,4480,4481,4482,4483,4484,4485,4486,4494,4495,4496,4497,4498,4499,4800,4801                                       ;37
+    write_tree_part6        dw 4802,4803,4804,4805,4815,4816,4817,4818,4819,5120,5121,5122,5123,5124,5136,5137,5138,5139,5440,5441,5442,5443,5457,5458,5459,5760,5761,5762,5763,5777,5778,5779,6080,6081,6082,6098,6099,6400,6401,6419    ;35
+    write_tree_part7        dw 6720,6721,6722,6723,6724,6735,6736,6737,6738,6739,7040,7041,7042,7043,7044,7055,7056,7057,7058,7059,7360,7361,7362,7363,7364,7375,7376,7377,7378,7379,7680,7681,7682,7683,7684,7695,7696,7697,7698,7699
+    write_tree_part8        dw 8000,8001,8002,8003,8004,8015,8016,8017,8018,8019,8320,8321,8322,8323,8324,8335,8336,8337,8338,8339,8640,8641,8642,8643,8644,8655,8656,8657,8658,8659,8960,8961,8962,8963,8964,8975,8976,8977,8978,8979
+    write_tree_part9        dw 9280,9281,9282,9283,9284,9295,9296,9297,9298,9299,9600,9601,9602,9603,9604,9615,9616,9617,9618,9619
 .stack 100h
+
 
 .code
     ;   ASCII_OUTPUT proto near c,arg:word
@@ -100,7 +109,7 @@ endm
                             xor          ah,ah
 
 
-                            call         OBSTACLE_MOVE
+                            call         OBSTACLE_MOVE              ;這只是設定一次位移幾個,沒call的話障礙物會靜止不動，這還要搭配
                             call         DELAY
                             call         SPACE_ESC
 
@@ -239,7 +248,12 @@ CHARACTOR_JUMP proc
                    call RANDOM_OBSTACLE_GENERATE
                    call WRITE_CHARACTOR_CL
                    call OBSTACLE_MOVE
+                   inc  call_score_output_time
+                   cmp  call_score_output_time,5    ;決定分數加的快慢
+                   jne  ignore_1
+                   mov  call_score_output_time,0
                    inc  score_now                   ;計分數
+    ignore_1:      
                    sub  charactor_position,bx
                    call WRITE_CHARACTOR
 .if end_game_over == 01h
@@ -254,7 +268,12 @@ CHARACTOR_JUMP proc
                    call RANDOM_OBSTACLE_GENERATE
                    call WRITE_CHARACTOR_CL
                    call OBSTACLE_MOVE
+                   inc  call_score_output_time
+                   cmp  call_score_output_time,5            ;決定分數加的快慢
+                   jne  ignore_2
+                   mov  call_score_output_time,0
                    inc  score_now                           ;計分數
+    ignore_2:      
                    add  charactor_position,bx
                    call WRITE_CHARACTOR
 .if end_game_over == 01h
@@ -296,9 +315,9 @@ RESTART proc
                    mov  score_now,0
                    push ax
                    mov  charactor_position,38440d
-                   mov  obstacle_position[0],0
-                   mov  obstacle_position[2],0
-                   mov  obstacle_position[4],0
+                   mov  obstacle_position[0],0d
+                   mov  obstacle_position[2],0d
+                   mov  obstacle_position[4],0d
                    mov  obstacle_number,0d
                    mov  obstacle_position_index,0d
                    mov  ah,00h
@@ -343,6 +362,7 @@ OBSTACLE proc near c,color_arg:byte
 .if dx < 30d
           jmp write_obstacle_loop
 .endif
+                   call   write_tree
                    add    si,2h
                    pop    cx
                    loop   obstacle_loop
@@ -421,6 +441,7 @@ RANDOM_OBSTACLE_GENERATE proc
                              push dx
                              push bx
                              push si
+                             xor  bx,bx
 .if obstacle_number == 3                                                   ;如果目前障礙物數量有三個就不用再產生障礙物
                              jmp  leave_generate
 .endif
@@ -430,22 +451,21 @@ RANDOM_OBSTACLE_GENERATE proc
           add dx,70                         ;70~179
           mov si,obstacle_position_index
 .if obstacle_number != 0
-          mov bx,obstacle_init
+          mov bx,obstacle_position[si+2]
           sub bx,obstacle_position[si]
 .else
-         int 21h
-         mov cx,dx
-         xor ch,ch
+         mov bx,obstacle_position[si+2]
+         sub bx,obstacle_position[si]
 .endif
 
     ;xor bx,000000000010011b
 
-.if dx > 140 && (bx > 70 || cx > 30 )
+.if (dx > 130 && dx < 150 && bx > 70)|| obstacle_number==0
 
           mov bx,obstacle_init
           mov obstacle_position[si],bx
           inc word ptr [obstacle_number]
-          add word ptr [obstacle_position_index],2d    ;因為obstacle_number有2bytes所以他的索引值要是2的倍數
+          add word ptr [obstacle_position_index],2d    ;每產生一個物體obstacle_position_index要多一組出來
 .endif
     leave_generate:          
                              pop  si
@@ -483,30 +503,35 @@ score_output proc
                       push cx
                       push dx
                       push di
+                      inc  call_score_output_time
+                      cmp  call_score_output_time,5    ;決定分數加的快慢
+                      jne  ignore
+                      mov  call_score_output_time,0
                       inc  score_now
+    ignore:           
                       mov  dx,score_high
 .if dx <=score_now
                       mov  dx,score_now
                       mov  score_high,dx
 .endif
                  mov       di,offset x_num
-                 call      clear              ;清除x_num字串的後三個字元
+                 call      clear                       ;清除x_num字串的後三個字元
                  mov       di,offset y_num
-                 call      clear              ;清除y_num字串的後三個字元
+                 call      clear                       ;清除y_num字串的後三個字元
     ;MUS_GET03                               ;取得滑鼠狀態及游標位置
                  mov       dx,score_high
-                 push      dx                 ;dx為歷史最高分數
+                 push      dx                          ;dx為歷史最高分數
 
-                 mov       ax,score_now       ;cx為滑鼠x座標
+                 mov       ax,score_now                ;cx為滑鼠x座標
                  mov       di,offset x_num
-                 call      tran               ;x座標轉換為十進制
+                 call      tran                        ;x座標轉換為十進制
                  pop       ax
                  mov       di,offset y_num
-                 call      tran               ;y座標轉換為十進制
+                 call      tran                        ;y座標轉換為十進制
 	
-                 SetCursor 0,35               ;設定游標位置
+                 SetCursor 0,35                        ;設定游標位置
                  PrintStr  x_num
-                 SetCursor 1,35               ;設定游標位置
+                 SetCursor 1,35                        ;設定游標位置
                  PrintStr  y_num
 
                  pop       di
@@ -564,5 +589,40 @@ tran proc
                  ret
 tran endp
 
+write_tree proc
+                 push      ax
+                 push      cx
+                 push      dx
+                 push      di
+                 push      bx
+                 xor       di,di
+                 xor       dx,dx
+                 xor       cx,cx
+                 xor       bx,bx
+                 mov       di,obstacle_position[si]
+                 push      si
+                 xor       si,si
+                 mov       ah,0fh
+                 add       si,0
+    L6:          
+    ;mov       cx,1
+    ;write_tree_loop:
+                 mov       dx,write_tree_part1[si]
+                 add       di,dx
+                 mov       es:[di],ah
+                 sub       di,dx
+                 inc       bx
+                 add       si,2
+    ;loop      write_tree_loop
+                 cmp       bx,302
+                 jne       L6
+                 pop       si
+                 pop       bx
+                 pop       di
+                 pop       dx
+                 pop       cx
+                 pop       ax
+                 ret
+write_tree endp
 
 end main
