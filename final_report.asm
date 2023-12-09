@@ -53,22 +53,16 @@ ENDM
 
 .stack 100h
 
-
-
 .code
               STORE_SCORE_DATA proto near c,arg:word,arg2:word    ;arg 分數 arg2偏移量
               OBSTACLE         proto near c,arg:byte
-
-
     main:     
               mov              ax,@data
               mov              ds,ax
               call             INIT_BACKGROUND
-    ;call OUTPUT_SCORE
     GAME_LOOP:
 .if end_game_over == 01h
               call             OUTPUT_SCORE
-   
               PRINT_STRING     mesg_2
               mov              dx,0000h
               mov              score,dx
@@ -99,10 +93,8 @@ ENDM
                             jnz          GAME_LOOP
     exit_program:           
                             call         INIT_SCREEN
-
                             mov          ax,4c00h
                             int          21h
-
     ;set the vedio segment 0a000h and go into mode 13h
 INIT_BACKGROUND proc
                             push         ax
@@ -139,7 +131,6 @@ WRITE_SCREEN_BACKGROUND PROC
                             pop          ax
                             ret
 WRITE_SCREEN_BACKGROUND ENDP
-
     ;畫角色
 WRITE_CHARACTOR proc
                             push         ax
@@ -162,14 +153,14 @@ WRITE_CHARACTOR proc
 .if cx < 20d
           jmp CHARACTOR_LOOP
 .endif
-                       call write_dinosaur
                        xor  cx,cx
                        add  di,300d
                        inc  dx
                        cmp  dx,40d
                        jnz  CHARACTOR_LOOP
-                       sub  di,300d
+                       sub  di,6380d
                        mov  charactor_last_position,di    ;以方便在沒跳起來時，也能隨時知道恐龍有沒有撞上障礙物
+                       call write_dinosaur
                        pop  dx
                        pop  cx
                        pop  di
@@ -222,7 +213,6 @@ SPACE_ESC proc
                    pop  ax
                    ret
 SPACE_ESC endp
-
     ;from 320*160 to 320*40
 CHARACTOR_JUMP proc
                    push ax
@@ -507,7 +497,7 @@ CLEAR_SCORE_DATA proc
                      push         ax
                      push         dx
                      push         cx
-                     mov          cx,11d                               ;;;設n+1個空格才能跑n個，尚不知道為甚麼
+                     mov          cx,11d
     clear_loop:      
                      mov          [di+3],' '
                      inc          di
@@ -544,74 +534,49 @@ STORE_SCORE_DATA proc near c,arg1:word,arg2_:word
 STORE_SCORE_DATA endp
 
 write_dinosaur proc
-                     push         ax
-                     push         cx
-                     push         dx
-                     push         di
                      push         bx
+                     push         si
                      xor          di,di
                      xor          dx,dx
-                     xor          cx,cx
                      xor          bx,bx
                      mov          di,charactor_position
-                     push         si
                      xor          si,si
                      mov          ah,0fh
                      add          si,0
     L6:              
-    ;mov       cx,1
-    ;write_tree_loop:
                      mov          dx,write_dinosaur_part1[si]
                      add          di,dx
                      mov          es:[di],ah
                      sub          di,dx
                      inc          bx
                      add          si,2
-    ;loop      write_tree_loop
                      cmp          bx,248
                      jne          L6
                      pop          si
                      pop          bx
-                     pop          di
-                     pop          dx
-                     pop          cx
-                     pop          ax
                      ret
 write_dinosaur endp
 
 write_tree proc
-                     push         ax
-                     push         cx
-                     push         dx
-                     push         di
                      push         bx
+                     push         si
                      xor          di,di
                      xor          dx,dx
-                     xor          cx,cx
                      xor          bx,bx
                      mov          di,obstacle_position[si]
-                     push         si
                      xor          si,si
                      mov          ah,0fh
-                     add          si,0
     L7:              
-    ;mov       cx,1
-    ;write_tree_loop:
                      mov          dx,write_tree_part1[si]
                      add          di,dx
                      mov          es:[di],ah
                      sub          di,dx
                      inc          bx
                      add          si,2
-    ;loop      write_tree_loop
                      cmp          bx,302
                      jne          L7
                      pop          si
                      pop          bx
-                     pop          di
-                     pop          dx
-                     pop          cx
-                     pop          ax
                      ret
 write_tree endp
 
