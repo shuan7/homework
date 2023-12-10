@@ -10,13 +10,11 @@ ENDM
 .model small
 
 .data
-    screen_hight            dw 200
-    screen_width            dw 320
+    ;screen_hight 200 screen_width 320
     color                   db 0fh                                                                                                                                                                                                                                                ;white
     ground_color            db 06h                                                                                                                                                                                                                                                ;brown
-    charactor_init          dw 38440d                                                                                                                                                                                                                                             ;320*120+40,charactor(40*20)
     charactor_color         db 04h
-    charactor_position      dw 38440d
+    charactor_position      dw 38440d                                                                                                                                                                                                                                             ;320*120+40,charactor(40*20)
     charactor_last_position dw 50940d
     exit_                   db 0h
     score                   dw 0h
@@ -100,7 +98,7 @@ INIT_BACKGROUND proc
                             push         ax
                             mov          ax,0a000h
                             mov          es,ax
-                            mov          ax,0013h                   ;設定一個320*200繪圖模式
+                            mov          ax,0013h
                             int          10h
                             call         WRITE_SCREEN_BACKGROUND
                             call         WRITE_CHARACTOR
@@ -142,7 +140,7 @@ WRITE_CHARACTOR proc
                             xor          di,di
                             mov          di,charactor_position
                             mov          ah,charactor_color
-                            mov          al,obstacle_color          ;為了要偵測有沒有撞上障礙物所設的
+                            mov          al,obstacle_color
     CHARACTOR_LOOP:         
 .if es:[di] == al
                             mov          end_game_over,01h
@@ -259,7 +257,7 @@ DELAY PROC
                    push cx
                    mov  ax,8600h
                    mov  cx,0000h
-                   mov  dx,06fffh
+                   mov  dx,07fffh
                    int  15h
                    pop  cx
                    pop  dx
@@ -273,7 +271,7 @@ DELAY2 PROC
                    push cx
                    mov  ax,8600h
                    mov  cx,0000h
-                   mov  dx,04000h
+                   mov  dx,05000h
                    int  15h
                    pop  cx
                    pop  dx
@@ -433,7 +431,12 @@ RANDOM_OBSTACLE_GENERATE proc
          xor ch,ch
 .endif
     ;&& bx < 300d
-.if dx > 160 && (bx > 250d)                            ;|| (bx < 60d && bx > 30d) || cx==0
+.if dx > 160 && (bx > 294d) || (bx < 60d && bx > 30d)
+          mov bx,obstacle_init
+          mov obstacle_position[si],bx
+          inc word ptr [obstacle_number]
+          add word ptr [obstacle_position_index],2d
+.elseif cx==1
           mov bx,obstacle_init
           mov obstacle_position[si],bx
           inc word ptr [obstacle_number]
@@ -480,10 +483,10 @@ OUTPUT_SCORE proc
                      mov          di,offset score_output
                      call         CLEAR_SCORE_DATA
                      mov          di,offset score_output
-                     invoke       STORE_SCORE_DATA,score,3d
-                     invoke       STORE_SCORE_DATA,highest_score,9d    ;加9因為中間有一個空格3(開頭)+5(score)+1(空格)
-                     mov          dx,0119h                             ;dh row dl colum
-                     mov          ah,02h                               ;定位游標位置
+                     invoke       STORE_SCORE_DATA,highest_score,3d
+                     invoke       STORE_SCORE_DATA,score,9d            ;加9因為中間有一個空格3(開頭)+5(score)+1(空格)
+                     mov          dx,0119h                             ;dh row dh colum
+                     mov          ah,02h
                      int          10h
                      PRINT_STRING score_output
                      pop          di
@@ -508,7 +511,7 @@ CLEAR_SCORE_DATA proc
                      ret
 CLEAR_SCORE_DATA endp
 
-    ;arg1分數 arg2_ 偏移量,也就是用來定位用的
+    ;arg1分數 arg2_ 偏移量
 STORE_SCORE_DATA proc near c,arg1:word,arg2_:word
                      push         di
                      mov          ax,arg1
@@ -519,7 +522,7 @@ STORE_SCORE_DATA proc near c,arg1:word,arg2_:word
                      mov          bx,10
                      mov          dx,0
                      div          bx
-                     push         dx                                   ;div bx將ax除以bx，ax存商數dx存餘數
+                     push         dx
                      cmp          ax,0
                      jne          Hex2Dec
                      add          di,si
@@ -550,7 +553,7 @@ write_dinosaur proc
                      sub          di,dx
                      inc          bx
                      add          si,2
-                     cmp          bx,248
+                     cmp          bx,235
                      jne          L6
                      pop          si
                      pop          bx
