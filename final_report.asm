@@ -257,7 +257,7 @@ DELAY PROC
                    push cx
                    mov  ax,8600h
                    mov  cx,0000h
-                   mov  dx,07fffh
+                   mov  dx,06fffh
                    int  15h
                    pop  cx
                    pop  dx
@@ -553,7 +553,7 @@ write_dinosaur proc
                      sub          di,dx
                      inc          bx
                      add          si,2
-                     cmp          bx,235
+                     cmp          bx,248
                      jne          L6
                      pop          si
                      pop          bx
